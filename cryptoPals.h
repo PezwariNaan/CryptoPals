@@ -4,6 +4,7 @@ using namespace std;
 
 vector<char> HexToBytes(const string& hex);
 string Base64Encode(const vector<char> input);
+string Base64Decode(const string &input);
 auto GetScore(vector<char> bytes);
 
 
@@ -18,6 +19,63 @@ vector<char> HexToBytes(const string& hex) {
   return bytes;
 }
 
+string Base64Decode(const std::string &encoded_string) {
+    const std::string base64_chars =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz"
+        "0123456789+/";
+
+    std::vector<int> decoding_table(256, -1);
+    for (int i = 0; i < 64; ++i) {
+        decoding_table[base64_chars[i]] = i;
+    }
+
+    int in_len = encoded_string.size();
+    int i = 0;
+    int j = 0;
+    int in_ = 0;
+    char char_array_4[4], char_array_3[3];
+    std::string decoded_string;
+
+    while (in_len-- && (encoded_string[in_] != '=') && (isalnum(encoded_string[in_]) || (encoded_string[in_] == '+') || (encoded_string[in_] == '/'))) {
+        char_array_4[i++] = encoded_string[in_];
+        in_++;
+        if (i == 4) {
+            for (i = 0; i < 4; ++i) {
+                char_array_4[i] = decoding_table[char_array_4[i]];
+            }
+
+            char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+            char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+            char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+
+            for (i = 0; i < 3; ++i) {
+                decoded_string += char_array_3[i];
+            }
+            i = 0;
+        }
+    }
+
+    if (i) {
+        for (j = i; j < 4; ++j) {
+            char_array_4[j] = 0;
+        }
+
+        for (j = 0; j < 4; ++j) {
+            char_array_4[j] = decoding_table[char_array_4[j]];
+        }
+
+        char_array_3[0] = (char_array_4[0] << 2) + ((char_array_4[1] & 0x30) >> 4);
+        char_array_3[1] = ((char_array_4[1] & 0xf) << 4) + ((char_array_4[2] & 0x3c) >> 2);
+        char_array_3[2] = ((char_array_4[2] & 0x3) << 6) + char_array_4[3];
+
+        for (j = 0; (j < i - 1); ++j) {
+            decoded_string += char_array_3[j];
+        }
+    }
+
+    return decoded_string;
+}
 
 string Base64Encode(const vector<char> input) {
     BIO *bio, *b64;
@@ -37,37 +95,43 @@ string Base64Encode(const vector<char> input) {
     return encoded;
 }
 
-auto GetScore(vector<char> bytes) {
-    unordered_map<char, int> letter_frequency = { 
-      { 'E', 26 }, {'M', 13 }, 
-      { 'A', 24 }, {'H', 18 }, 
-      { 'R', 21 }, {'G', 11 }, 
-      { 'I', 20 }, {'B', 07 },
-      { 'O', 23 }, {'F', 15 }, 
-      { 'T', 25 }, {'Y', 10 },
-      { 'N', 22 }, {'W', 8 },
-      { 'S', 19 }, {'K', 5 },
-      { 'L', 16 }, {'V', 6 },
-      { 'C', 14 }, {'X', 3 },
-      { 'U', 12 }, {'Z', 2 },
-      { 'D', 17 }, {'J', 4 },
-      { 'P', 9 },  {'Q', 1 } 
-    };
+char GetScore(string ciphertext) {
+    vector<char> letters = {'E','T','A','O','I','N',
+                            'S','H','R','D','L','U', ' '};
     
-    map<float, char> scores_and_keys;
-    
+    //string ciphertext_hex = readfile(argv[1]);
+    //vector<char> ciphertext = HexToBytes(ciphertext_hex);
+    int highscore = 0;
+    char likely_key;
+
     for (int i = 0; i < 256; i++) {
-        float score = 0;
-        for (int j = 0; j < bytes.size(); j++) {
-            char xord_byte = bytes[j] ^ i;
-            auto result = letter_frequency.find(toupper(xord_byte));
-            if (result != letter_frequency.end()) {
-                score += result->second;
+        int score = 0;
+        for (int j = 0; j < ciphertext.size(); j ++) {
+            //cout << "testing: " << i;
+            //cout << ", Against: " << ciphertext[j] << endl;
+            vector<char>::iterator iterator = letters.begin();
+            char xor_byte = ciphertext[j] ^ i;
+            while (iterator != letters.end()) {
+                if (toupper(xor_byte) == *iterator) {
+                    score++;
+                    break;
+                } else {
+                    iterator++;
+                }
             }
         }
-        scores_and_keys.insert(pair<float, char>(score, i));
+        if (score > highscore) {
+            highscore = score;
+            likely_key = i;
+            }
     }
-    auto map_itr = scores_and_keys.end();
-    map_itr--;
-    return map_itr;
+    //cout << "Likely Key: " << likely_key << endl;
+    
+    //for (int i = 0; i < ciphertext.size() -1; i++) {
+    //    char decyphered_byte = ciphertext[i] ^ likely_key;
+    //    plaintext += decyphered_byte;
+    //} 
+    
+    //cout << plaintext << endl;;
+    return likely_key;
 }
